@@ -145,10 +145,11 @@ const TeamScheduler: React.FC<TeamSchedulerProps> = ({ userId, username }) => {
 
             // Then, fetch shared schedules
             if (userId) {
-                const { data: sharedWithMe, error: shareError } = await supabase
-                    .from("shared_schedules")
-                    .select("*")
-                    .eq("shared_with_user_id", userId);
+                const { data: sharedWithMe, error: _shareError } =
+                    await supabase
+                        .from("shared_schedules")
+                        .select("*")
+                        .eq("shared_with_user_id", userId);
 
                 if (sharedWithMe) {
                     for (const share of sharedWithMe) {
