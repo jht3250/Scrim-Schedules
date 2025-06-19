@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
-import { Share2, UserPlus, X, Eye } from "lucide-react";
+import { Share2, UserPlus, X, Users } from "lucide-react";
 
 interface ShareManagementProps {
     userId: string;
+    username?: string;
 }
 
 interface Share {
@@ -12,27 +13,55 @@ interface Share {
     created_at: string;
 }
 
-const ShareManagement: React.FC<ShareManagementProps> = ({ userId }) => {
+interface SharedWithMe {
+    id: number;
+    owner_username: string;
+    created_at: string;
+}
+
+const ShareManagement: React.FC<ShareManagementProps> = ({
+    userId,
+    username,
+}) => {
     const [shares, setShares] = useState<Share[]>([]);
+    const [sharedWithMe, setSharedWithMe] = useState<SharedWithMe[]>([]);
     const [newUsername, setNewUsername] = useState("");
-    const [viewingUsername, setViewingUsername] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         fetchShares();
-    }, []);
+        fetchSharedWithMe();
+    }, [username]);
 
     const fetchShares = async () => {
+        // Use the view instead of the table to get usernames
         const { data, error } = await supabase
-            .from("schedule_shares")
+            .from("shared_schedules")
             .select("*")
+            .eq("owner_id", userId)
             .order("created_at", { ascending: false });
 
         if (error) {
             console.error("Error fetching shares:", error);
         } else {
             setShares(data || []);
+        }
+    };
+
+    const fetchSharedWithMe = async () => {
+        if (!username) return;
+
+        const { data, error } = await supabase
+            .from("shared_schedules")
+            .select("*")
+            .eq("shared_with_username", username)
+            .order("created_at", { ascending: false });
+
+        if (error) {
+            console.error("Error fetching shared schedules:", error);
+        } else {
+            setSharedWithMe(data || []);
         }
     };
 
@@ -43,10 +72,10 @@ const ShareManagement: React.FC<ShareManagementProps> = ({ userId }) => {
         setLoading(true);
 
         try {
-            // Check if username exists
+            // Check if username exists and get their ID
             const { data: profile } = await supabase
                 .from("profiles")
-                .select("username")
+                .select("id")
                 .eq("username", newUsername)
                 .single();
 
@@ -54,10 +83,10 @@ const ShareManagement: React.FC<ShareManagementProps> = ({ userId }) => {
                 throw new Error("Username not found");
             }
 
-            // Add share
+            // Add share using the user ID
             const { error } = await supabase.from("schedule_shares").insert({
                 owner_id: userId,
-                shared_with_username: newUsername,
+                shared_with_user_id: profile.id,
             });
 
             if (error) throw error;
@@ -82,13 +111,6 @@ const ShareManagement: React.FC<ShareManagementProps> = ({ userId }) => {
         } else {
             await fetchShares();
         }
-    };
-
-    const viewSchedule = async (username: string) => {
-        if (!username) return;
-
-        // Reload the page with a query parameter to view another user's schedule
-        window.location.href = `?view=${username}`;
     };
 
     return (
@@ -150,28 +172,27 @@ const ShareManagement: React.FC<ShareManagementProps> = ({ userId }) => {
                     </div>
                 </div>
 
-                {/* View others' schedules */}
+                {/* People sharing with you */}
                 <div>
-                    <h3 className="font-medium mb-3">View Shared Schedule</h3>
-                    <div className="flex gap-2">
-                        <input
-                            type="text"
-                            value={viewingUsername}
-                            onChange={(e) => setViewingUsername(e.target.value)}
-                            placeholder="Enter username to view"
-                            className="flex-1 bg-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        />
-                        <button
-                            onClick={() => viewSchedule(viewingUsername)}
-                            className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg transition"
-                        >
-                            <Eye className="w-5 h-5" />
-                        </button>
-                    </div>
-                    <p className="text-gray-400 text-xs mt-2">
-                        You can only view schedules that have been shared with
-                        you
-                    </p>
+                    <h3 className="font-medium mb-3">Shared With You</h3>
+
+                    {sharedWithMe.length > 0 ? (
+                        <div className="space-y-2">
+                            {sharedWithMe.map((share) => (
+                                <div
+                                    key={share.id}
+                                    className="bg-gray-700 rounded-lg px-3 py-2 text-sm flex items-center gap-2"
+                                >
+                                    <Users className="w-4 h-4 text-purple-400" />
+                                    <span>{share.owner_username}</span>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="text-gray-400 text-sm">
+                            No one has shared their schedule with you yet
+                        </p>
+                    )}
                 </div>
             </div>
         </div>

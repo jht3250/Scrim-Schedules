@@ -8,7 +8,6 @@ import ShareManagement from "./components/ShareManagement";
 const App: React.FC = () => {
     const [user, setUser] = useState<any>(null);
     const [profile, setProfile] = useState<any>(null);
-    const [viewingUser, setViewingUser] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -18,19 +17,12 @@ const App: React.FC = () => {
         // Listen for auth changes
         const {
             data: { subscription },
-        } = supabase.auth.onAuthStateChange((event, session) => {
+        } = supabase.auth.onAuthStateChange((_event, session) => {
             setUser(session?.user || null);
             if (session?.user) {
                 fetchProfile(session.user.id);
             }
         });
-
-        // Check URL params for viewing another user
-        const urlParams = new URLSearchParams(window.location.search);
-        const viewParam = urlParams.get("view");
-        if (viewParam) {
-            setViewingUser(viewParam);
-        }
 
         return () => subscription.unsubscribe();
     }, []);
@@ -64,22 +56,6 @@ const App: React.FC = () => {
         await supabase.auth.signOut();
         setUser(null);
         setProfile(null);
-        setViewingUser(null);
-        // Clear URL params
-        window.history.replaceState(
-            {},
-            document.title,
-            window.location.pathname
-        );
-    };
-
-    const clearViewingMode = () => {
-        setViewingUser(null);
-        window.history.replaceState(
-            {},
-            document.title,
-            window.location.pathname
-        );
     };
 
     if (loading) {
@@ -100,24 +76,11 @@ const App: React.FC = () => {
             <div className="bg-gray-800 shadow-lg">
                 <div className="max-w-7xl mx-auto px-4 py-4">
                     <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                            <div className="flex items-center gap-2">
-                                <User className="w-5 h-5" />
-                                <span className="font-medium">
-                                    {profile?.username}
-                                </span>
-                            </div>
-                            {viewingUser && (
-                                <div className="bg-blue-600 px-3 py-1 rounded-full text-sm flex items-center gap-2">
-                                    Viewing: {viewingUser}
-                                    <button
-                                        onClick={clearViewingMode}
-                                        className="hover:text-gray-200"
-                                    >
-                                        ×
-                                    </button>
-                                </div>
-                            )}
+                        <div className="flex items-center gap-2">
+                            <User className="w-5 h-5" />
+                            <span className="font-medium">
+                                {profile?.username}
+                            </span>
                         </div>
                         <button
                             onClick={handleSignOut}
@@ -133,11 +96,13 @@ const App: React.FC = () => {
             {/* Main Content */}
             <div className="p-4">
                 <div className="max-w-7xl mx-auto">
-                    {!viewingUser && <ShareManagement userId={user.id} />}
+                    <ShareManagement
+                        userId={user.id}
+                        username={profile?.username}
+                    />
                     <TeamScheduler
                         userId={user.id}
-                        viewingUserId={viewingUser}
-                        isViewOnly={!!viewingUser}
+                        username={profile?.username}
                     />
                 </div>
             </div>
