@@ -122,59 +122,7 @@ const TeamScheduler: React.FC<TeamSchedulerProps> = ({ userId, username }) => {
     // Fetch all schedules on mount
     useEffect(() => {
         fetchAllSchedules();
-
-        // DEBUG: Test RLS policy
-        testRLSPolicy();
-
-        // Temporary: expose supabase for console testing
-        (window as any).testSupabase = supabase;
     }, [userId, username]);
-
-    const testRLSPolicy = async () => {
-        console.log("=== RLS POLICY TEST ===");
-
-        // Test 1: Who am I?
-        const {
-            data: { user },
-        } = await supabase.auth.getUser();
-        console.log("Current user:", user?.email, "ID:", user?.id);
-
-        // Test 2: Can I see Minkoui's teams directly?
-        const { data: minkouiTeams, error: minkouiError } = await supabase
-            .from("teams")
-            .select("*")
-            .eq("user_id", "0a62c72c-90ad-44cf-8052-0ac425a45212");
-
-        console.log("Minkoui teams query result:", minkouiTeams);
-        console.log("Minkoui teams error:", minkouiError);
-
-        // Test 3: Get ALL teams I can see
-        const { data: allTeams, error: allError } = await supabase
-            .from("teams")
-            .select("*");
-
-        console.log("ALL teams I can see:", allTeams);
-        console.log("All teams error:", allError);
-
-        // Test 4: Check shares
-        const { data: shares } = await supabase
-            .from("shared_schedules")
-            .select("*")
-            .eq("shared_with_username", username);
-
-        console.log("Shares for me:", shares);
-
-        // Test 5: Call the debug function
-        const { data: debugData, error: debugError } = await supabase.rpc(
-            "debug_team_access",
-            {
-                team_user_id: "0a62c72c-90ad-44cf-8052-0ac425a45212",
-            }
-        );
-
-        console.log("Debug function result:", debugData);
-        console.log("Debug function error:", debugError);
-    };
 
     const fetchAllSchedules = async () => {
         try {
@@ -201,9 +149,6 @@ const TeamScheduler: React.FC<TeamSchedulerProps> = ({ userId, username }) => {
                     .from("shared_schedules")
                     .select("*")
                     .eq("shared_with_user_id", userId);
-
-                console.log("Shared with me:", sharedWithMe);
-                console.log("Share error:", shareError);
 
                 if (sharedWithMe) {
                     for (const share of sharedWithMe) {
@@ -233,10 +178,6 @@ const TeamScheduler: React.FC<TeamSchedulerProps> = ({ userId, username }) => {
         isOwn: boolean
     ): Promise<UserSchedule | null> => {
         try {
-            console.log(
-                `Fetching schedule for ${fetchUsername} (${fetchUserId}), isOwn: ${isOwn}`
-            );
-
             let teamsData: Team[] = [];
             let teamsError: any = null;
 
@@ -252,12 +193,7 @@ const TeamScheduler: React.FC<TeamSchedulerProps> = ({ userId, username }) => {
                 teamsError = result.error;
             } else {
                 // For shared schedules, use the RPC function that bypasses RLS
-                console.log(
-                    "Using get_accessible_teams RPC for shared schedule..."
-                );
                 const result = await supabase.rpc("get_accessible_teams");
-
-                console.log("RPC raw result:", result);
 
                 if (result.data) {
                     // The RPC returns teams with user_id property
@@ -265,22 +201,14 @@ const TeamScheduler: React.FC<TeamSchedulerProps> = ({ userId, username }) => {
                     teamsData = result.data.filter(
                         (team: any) => team.user_id === fetchUserId
                     );
-                    console.log(
-                        `Filtered teams for ${fetchUserId}:`,
-                        teamsData
-                    );
                 }
                 teamsError = result.error;
             }
-
-            console.log("Teams data:", teamsData);
-            console.log("Teams error:", teamsError);
 
             if (teamsError) throw teamsError;
 
             // Fetch events for all teams
             const teamIds = teamsData?.map((team) => team.id) || [];
-            console.log(`Fetching events for team IDs:`, teamIds);
 
             if (teamIds.length > 0) {
                 let eventsData: any[] = [];
@@ -297,9 +225,6 @@ const TeamScheduler: React.FC<TeamSchedulerProps> = ({ userId, username }) => {
                     eventsError = result.error;
                 } else {
                     // For shared teams, use RPC function if available
-                    console.log(
-                        "Using RPC to fetch events for shared teams..."
-                    );
                     const result = await supabase.rpc(
                         "get_events_for_accessible_teams"
                     );
@@ -313,9 +238,6 @@ const TeamScheduler: React.FC<TeamSchedulerProps> = ({ userId, username }) => {
                     eventsError = result.error;
                 }
 
-                console.log(`Events data for ${fetchUsername}:`, eventsData);
-                console.log(`Events error for ${fetchUsername}:`, eventsError);
-
                 if (eventsError) throw eventsError;
 
                 // Combine teams with their events
@@ -326,11 +248,6 @@ const TeamScheduler: React.FC<TeamSchedulerProps> = ({ userId, username }) => {
                             (event) => event.team_id === team.id
                         ) || [],
                 }));
-
-                console.log(
-                    `Teams with events for ${fetchUsername}:`,
-                    teamsWithEvents
-                );
 
                 return {
                     username: fetchUsername,
@@ -462,13 +379,6 @@ const TeamScheduler: React.FC<TeamSchedulerProps> = ({ userId, username }) => {
         } catch (error) {
             console.error("Error deleting team:", error);
         }
-    };
-
-    const getTeamsForDay = (day: string, teams: Team[]): Team[] => {
-        return teams.filter(
-            (team) =>
-                team.events && team.events.some((event) => event.day === day)
-        );
     };
 
     if (loading) {
