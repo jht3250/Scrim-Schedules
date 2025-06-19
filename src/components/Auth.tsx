@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { supabase } from "../lib/supabase";
-import { User, Lock, Mail, Loader } from "lucide-react";
+import { User, Lock, Mail, Loader, CheckCircle } from "lucide-react";
 
 interface AuthProps {
     onSuccess: () => void;
@@ -13,6 +13,8 @@ const Auth: React.FC<AuthProps> = ({ onSuccess }) => {
     const [username, setUsername] = useState("");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [showConfirmationMessage, setShowConfirmationMessage] =
+        useState(false);
 
     const handleSubmit = async () => {
         setLoading(true);
@@ -44,14 +46,11 @@ const Auth: React.FC<AuthProps> = ({ onSuccess }) => {
 
                 if (signUpError) throw signUpError;
 
-                // Auto sign in after signup
-                const { error: signInError } =
-                    await supabase.auth.signInWithPassword({
-                        email,
-                        password,
-                    });
-
-                if (signInError) throw signInError;
+                // After successful signup, switch to login mode and show confirmation message
+                setMode("login");
+                setShowConfirmationMessage(true);
+                setPassword(""); // Clear password for security
+                setUsername(""); // Clear username
             } else {
                 // Sign in
                 const { error } = await supabase.auth.signInWithPassword({
@@ -60,9 +59,9 @@ const Auth: React.FC<AuthProps> = ({ onSuccess }) => {
                 });
 
                 if (error) throw error;
-            }
 
-            onSuccess();
+                onSuccess();
+            }
         } catch (err: any) {
             setError(err.message);
         } finally {
@@ -76,6 +75,23 @@ const Auth: React.FC<AuthProps> = ({ onSuccess }) => {
                 <h2 className="text-3xl font-bold text-center mb-8">
                     {mode === "login" ? "Welcome Back" : "Create Account"}
                 </h2>
+
+                {/* Confirmation Message */}
+                {showConfirmationMessage && (
+                    <div className="mb-6 p-4 bg-green-500/10 border border-green-500/20 rounded-lg flex items-start gap-3">
+                        <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />
+                        <div className="text-sm text-green-400">
+                            <p className="font-semibold mb-1">
+                                Please confirm your email
+                            </p>
+                            <p className="text-green-400/80">
+                                We've sent a confirmation link to your email
+                                address. Please check your inbox and click the
+                                link to activate your account.
+                            </p>
+                        </div>
+                    </div>
+                )}
 
                 <div className="space-y-4">
                     {mode === "signup" && (
@@ -165,6 +181,7 @@ const Auth: React.FC<AuthProps> = ({ onSuccess }) => {
                         onClick={() => {
                             setMode(mode === "login" ? "signup" : "login");
                             setError(null);
+                            setShowConfirmationMessage(false);
                         }}
                         className="text-purple-400 hover:text-purple-300 font-medium mt-1"
                     >
